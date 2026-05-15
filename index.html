@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부산 맛집 탐험</title>
+    <style>
+        :root {
+            --primary: #3b82f6; --text-main: #111827; --text-sub: #6b7280;
+            --bg-gray: #f3f4f6; --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; }
+        body { background: var(--bg-gray); color: var(--text-main); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        header { margin-bottom: 24px; }
+        .logo { font-size: 28px; font-weight: 800; margin-bottom: 16px; }
+        .search-bar {
+            width: 100%; padding: 16px 20px; border: 1px solid #e5e7eb; border-radius: 50px;
+            font-size: 16px; outline: none; background: white;
+        }
+        
+        .filter-section {
+            background: white; padding: 24px; border-radius: var(--radius); box-shadow: var(--card-shadow);
+            margin-bottom: 32px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 12px; min-width: 200px; }
+        .filter-label { font-weight: 700; font-size: 14px; }
+        select.filter-select {
+            padding: 10px 16px; border: 1px solid #d1d5db; border-radius: 8px;
+            background: white; cursor: pointer; min-width: 180px;
+        }
+        .tag-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .tag-btn {
+            padding: 10px 20px; border: 1px solid #e5e7eb; border-radius: 50px; background: #f9fafb;
+            color: var(--text-sub); font-weight: 500; cursor: pointer; transition: 0.2s; font-size: 14px;
+        }
+        .tag-btn:hover, .tag-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .result-count { color: var(--primary); font-weight: 700; font-size: 14px; }
+        .loading { text-align: center; padding: 40px; color: var(--text-sub); }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+        .card {
+            background: white; border-radius: var(--radius); overflow: hidden; box-shadow: var(--card-shadow);
+            transition: transform 0.2s; position: relative; cursor: pointer;
+        }
+        .card:hover { transform: translateY(-4px); }
+        .card-img-wrap { position: relative; height: 200px; overflow: hidden; background: #f3f4f6; }
+        .card-img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .checkbox {
+            position: absolute; top: 12px; left: 12px; width: 24px; height: 24px;
+            border: 2px solid white; border-radius: 6px; background: rgba(0,0,0,0.3);
+            cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center;
+        }
+        .checkbox.checked { background: var(--primary); }
+        .checkbox.checked::after { content: '✓'; color: white; font-size: 14px; font-weight: bold; }
+        
+        .card-body { padding: 20px; }
+        .card-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .tags { display: flex; gap: 8px; margin-bottom: 12px; }
+        .badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+        .badge.region { background: #eff6ff; color: var(--primary); }
+        .badge.type { background: #ecfdf5; color: #059669; }
+        .card-desc { font-size: 14px; color: var(--text-sub); margin-bottom: 16px; line-height: 1.5; 
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-addr { font-size: 12px; color: #9ca3af; }
+        
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 16px 24px;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;
+            z-index: 50; transform: translateY(100%); transition: transform 0.3s;
+        }
+        .bottom-bar.show { transform: translateY(0); }
+        .bar-btn {
+            background: var(--primary); color: white; border: none; padding: 12px 24px;
+            border-radius: 10px; font-weight: 600; cursor: pointer;
+        }
+        .bar-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal {
+            background: white; width: 90%; max-width: 600px; max-height: 90vh; border-radius: 16px;
+            overflow-y: auto; position: relative; animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { padding: 24px; border-bottom: 1px solid #e5e7eb; }
+        .modal-title { font-size: 24px; font-weight: 800; }
+        .modal-body { padding: 24px; }
+        .info-row { display: flex; gap: 12px; margin-bottom: 12px; font-size: 15px; color: var(--text-sub); }
+        .section-title { font-size: 18px; font-weight: 700; margin: 24px 0 12px; }
+        .menu-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #e5e7eb; }
+        .modal-footer { padding: 16px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; }
+        .btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-secondary { background: #e5e7eb; }
+        .btn-primary { background: var(--primary); color: white; }
+        
+        @media (max-width: 768px) {
+            .filter-section { flex-direction: column; }
+            select.filter-select { width: 100%; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="logo">🍽️ 부산 맛집 탐험</div>
+        <input type="text" class="search-bar" id="searchInput" placeholder="맛집 이름이나 주소로 검색...">
+    </header>
+    
+    <div class="filter-section">
+        <div class="filter-group">
+            <label class="filter-label">📍 행정구</label>
+            <select class="filter-select" id="districtFilter">
+                <option value="">전체</option>
+            </select>
+        </div>
+        <div class="filter-group" style="flex: 1;">
+            <label class="filter-label">🍽️ 메뉴 분류</label>
+            <div class="tag-group" id="categoryFilter">
+                <button class="tag-btn active" data-category="">전체</button>
+                <button class="tag-btn" data-category="밀면">면식</button>
+                <button class="tag-btn" data-category="찜|조림|국|탕">한식</button>
+                <button class="tag-btn" data-category="구이|치킨">구이</button>
+                <button class="tag-btn" data-category="꼼장어|복어|생선">해산물</button>
+                <button class="tag-btn" data-category="정식|보쌈">세트</button>
+            </div>
+        </div>
+        <div style="width: 100%; font-size: 14px; color: var(--text-sub);">
+            찾은 맛집: <span class="result-count" id="resultCount">로딩중...</span>
+        </div>
+    </div>
+    
+    <div class="grid" id="restaurantGrid">
+        <div class="loading">🔄 데이터를 불러오는 중...</div>
+    </div>
+</div>
+
+<div class="bottom-bar" id="bottomBar">
+    <div class="bar-left">선택한 맛집 <span id="selectedCount">0</span>/5 개</div>
+    <button class="bar-btn" id="generateRouteBtn" disabled>🤖 AI 추천 코스 생성</button>
+</div>
+
+<div class="modal-overlay" id="detailModal">
+    <div class="modal">
+        <div class="modal-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="tags">
+                    <span class="badge region" id="modalRegion">-</span>
+                    <span class="badge type" id="modalType">-</span>
+                </div>
+                <button onclick="closeModal()" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+            </div>
+            <h2 class="modal-title" id="modalTitle" style="margin-top:8px;">-</h2>
+        </div>
+        <div class="modal-body">
+            <div class="info-row"><span>📍</span> <span id="modalAddr">-</span></div>
+            <div class="info-row"><span>📞</span> <span id="modalTel">-</span></div>
+            <div class="info-row"><span>🕒</span> <span id="modalTime">-</span></div>
+            <div class="section-title">소개</div>
+            <p style="font-size: 14px; line-height: 1.6; color: var(--text-sub);" id="modalDesc">-</p>
+            <div class="section-title">대표 메뉴</div>
+            <div id="modalMenuList"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">← 돌아가기</button>
+            <button class="btn btn-primary" id="modalAddBtn">+ 내 루트에 추가</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ================= 配置 =================
+// ⚠️ 请确认您的 API Key 是 3568581111... (5个1) 还是 356858111... (4个1)
+const API_KEY = '3568581111e982966997c7e37b05299480a4587a60284ad9f02814e8147d220e';
+const BASE_URL = 'https://apis.data.go.kr/6260000/FoodService/getFoodKr';
+
+const CATEGORY_KEYWORDS = {
+    '밀면': ['밀면', '냉면', '국수'],
+    '찜|조림|국|탕': ['찜', '조림', '국', '탕', '곰탕', '찌개'],
+    '구이|치킨': ['구이', '치킨', '튀김', '갈비'],
+    '꼼장어|복어|생선': ['꼼장어', '복어', '생선', '해물', '회'],
+    '정식|보쌈': ['정식', '보쌈', '한정식', '세트']
+};
+
+let allRestaurants = [];
+let selectedIds = new Set();
+
+// ================= 初始化 =================
+document.addEventListener('DOMContentLoaded', async () => {
+    await fetchRestaurants();
+    setupEventListeners();
+});
+
+// ================= API 调用 =================
+async function fetchRestaurants() {
+    const grid = document.getElementById('restaurantGrid');
+    const countEl = document.getElementById('resultCount');
+    
+    try {
+        // ✅ 正确的参数：serviceKey, pageNo, numOfRows, type
+        const params = new URLSearchParams({
+            serviceKey: API_KEY,
+            pageNo: '1',
+            numOfRows: '50',
+            type: 'xml'
+        });
+        const apiUrl = `${BASE_URL}?${params.toString()}`;
+        
+        console.log('📡 API URL:', apiUrl);
+        grid.innerHTML = '<div class="loading">🔄 데이터를 불러오는 중...</div>';
+        
+        const response = await fetch(apiUrl);
+        console.log('📥 Status:', response.status);
+        
+        if (response.status === 401) {
+            throw new Error('API 키가 유효하지 않습니다. data.go.kr 에서 키를 다시 확인해주세요.');
+        }
+        if (response.status === 403) {
+            throw new Error('API 접근 권한이 없습니다. 활용신청 승인 상태를 확인해주세요.');
+        }
+        if (!response.ok) {
+            throw new Error(`HTTP 오류: ${response.status}`);
+        }
+        
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, 'text/xml');
+        
+        const parseError = xml.querySelector('parsererror');
+        if (parseError) throw new Error('XML 파싱 오류');
+        
+        const resultCode = xml.querySelector('resultCode')?.textContent;
+        if (resultCode !== '00') {
+            const msg = xml.querySelector('resultMsg')?.textContent;
+            throw new Error(`API 오류 (${resultCode}): ${msg}`);
+        }
+        
+        const items = xml.querySelectorAll('item');
+        console.log(`📊 수신 데이터: ${items.length}개`);
+        
+        if (items.length === 0) {
+            grid.innerHTML = '<div style="text-align:center;padding:40px">데이터가 없습니다 😅</div>';
+            countEl.textContent = '0';
+            return;
+        }
+        
+        allRestaurants = Array.from(items).map(item => ({
+            id: item.querySelector('UC_SEQ')?.textContent || '',
+            title: item.querySelector('MAIN_TITLE')?.textContent || '무제',
+            district: item.querySelector('GUGUN_NM')?.textContent || '',
+            address: item.querySelector('ADDR1')?.textContent || '',
+            menu: item.querySelector('RPRSNTV_MENU')?.textContent || '',
+            desc: item.querySelector('ITEMCNTNTS')?.textContent || '',
+            tel: item.querySelector('CNTCT_TEL')?.textContent || '',
+            time: item.querySelector('USAGE_DAY_WEEK_AND_TIME')?.textContent || '',
+            lat: item.querySelector('LAT')?.textContent,
+            lng: item.querySelector('LNG')?.textContent,
+            img: item.querySelector('MAIN_IMG_THUMB')?.textContent || '',
+            homepage: item.querySelector('HOMEPAGE_URL')?.textContent
+        }));
+        
+        initDistrictFilter();
+        renderList(allRestaurants);
+        
+    } catch (error) {
+        console.error('❌ 오류:', error);
+        grid.innerHTML = `
+            <div style="text-align:center;padding:40px;color:#ef4444">
+                ❌ 데이터 로딩 실패<br>
+                <small>${error.message}</small><br>
+                <small style="color:#6b7280">F12 콘솔에서 상세 오류 확인</small>
+            </div>`;
+        countEl.textContent = '오류';
+    }
+}
+
+// ================= 筛选逻辑 =================
+function initDistrictFilter() {
+    const districts = [...new Set(allRestaurants.map(r => r.district).filter(d => d))].sort();
+    const select = document.getElementById('districtFilter');
+    districts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        select.appendChild(opt);
+    });
+}
+
+function applyFilters() {
+    const district = document.getElementById('districtFilter').value;
+    const category = document.querySelector('#categoryFilter .tag-btn.active')?.dataset.category || '';
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filtered = allRestaurants;
+    if (district) filtered = filtered.filter(r => r.district === district);
+    if (category) {
+        const keywords = category.split('|');
+        filtered = filtered.filter(r => {
+            const text = (r.menu + ' ' + r.desc).toLowerCase();
+            return keywords.some(kw => text.includes(kw.toLowerCase()));
+        });
+    }
+    if (search) {
+        filtered = filtered.filter(r => 
+            r.title.toLowerCase().includes(search) || 
+            r.address.toLowerCase().includes(search) ||
+            r.menu.toLowerCase().includes(search)
+        );
+    }
+    renderList(filtered);
+}
+
+function renderList(restaurants) {
+    const grid = document.getElementById('restaurantGrid');
+    document.getElementById('resultCount').textContent = restaurants.length;
+    
+    if (restaurants.length === 0) {
+        grid.innerHTML = '<div style="text-align:center;padding:40px;color:#6b7280">검색 결과가 없습니다 😅</div>';
+        return;
+    }
+    
+    grid.innerHTML = restaurants.map(item => `
+        <div class="card" onclick="openDetail('${item.id}')">
+            <div class="card-img-wrap">
+                <div class="checkbox ${selectedIds.has(item.id) ? 'checked' : ''}" 
+                     onclick="event.stopPropagation(); toggleSelect('${item.id}')"></div>
+                <img class="card-img" src="${item.img || 'https://via.placeholder.com/320x200?text=No+Image'}" 
+                     alt="${item.title}" onerror="this.src='https://via.placeholder.com/320x200?text=Image+Error'">
+            </div>
+            <div class="card-body">
+                <div class="card-title">${item.title}</div>
+                <div class="tags">
+                    <span class="badge region">${item.district}</span>
+                    <span class="badge type">${getCategoryLabel(item.menu)}</span>
+                </div>
+                <div class="card-desc">${item.desc}</div>
+                <div class="card-addr">📍 ${item.address}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getCategoryLabel(menu) {
+    if (!menu) return '기타';
+    const m = menu.toLowerCase();
+    if (m.includes('밀면') || m.includes('냉면')) return '면식';
+    if (m.includes('찜') || m.includes('조림') || m.includes('국')) return '한식';
+    if (m.includes('구이') || m.includes('치킨')) return '구이';
+    if (m.includes('꼼장어') || m.includes('복어') || m.includes('생선')) return '해산물';
+    return '기타';
+}
+
+// ================= 事件绑定 =================
+function setupEventListeners() {
+    document.getElementById('districtFilter').addEventListener('change', applyFilters);
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('categoryFilter').addEventListener('click', (e) => {
+        if (e.target.classList.contains('tag-btn')) {
+            document.querySelectorAll('#categoryFilter .tag-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            applyFilters();
+        }
+    });
+    document.getElementById('generateRouteBtn').addEventListener('click', () => {
+        if (selectedIds.size === 0) return;
+        alert(`🤖 AI 경로 생성 기능은 3주차에 구현됩니다!\n현재 선택: ${[...selectedIds].size}개`);
+    });
+}
+
+function toggleSelect(id) {
+    if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+    } else {
+        if (selectedIds.size >= 5) { alert('최대 5개까지 선택 가능합니다!'); return; }
+        selectedIds.add(id);
+    }
+    updateBottomBar();
+    applyFilters();
+}
+
+function updateBottomBar() {
+    const bar = document.getElementById('bottomBar');
+    const count = document.getElementById('selectedCount');
+    const btn = document.getElementById('generateRouteBtn');
+    count.textContent = selectedIds.size;
+    btn.disabled = selectedIds.size === 0;
+    selectedIds.size > 0 ? bar.classList.add('show') : bar.classList.remove('show');
+}
+
+// ================= 详情页 =================
+function openDetail(id) {
+    const item = allRestaurants.find(r => r.id === id);
+    if (!item) return;
+    document.getElementById('modalTitle').textContent = item.title;
+    document.getElementById('modalRegion').textContent = item.district;
+    document.getElementById('modalType').textContent = getCategoryLabel(item.menu);
+    document.getElementById('modalAddr').textContent = item.address;
+    document.getElementById('modalTel').textContent = item.tel || '-';
+    document.getElementById('modalTime').textContent = item.time || '-';
+    document.getElementById('modalDesc').textContent = item.desc;
+    
+    const menuList = document.getElementById('modalMenuList');
+    if (item.menu) {
+        menuList.innerHTML = item.menu.split(',').map(m => 
+            `<div class="menu-item"><span>${m.trim()}</span><span>-</span></div>`
+        ).join('');
+    } else {
+        menuList.innerHTML = '<div style="color:#9ca3af;font-size:14px">메뉴 정보가 없습니다</div>';
+    }
+    
+    document.getElementById('modalAddBtn').onclick = () => { toggleSelect(item.id); closeModal(); };
+    document.getElementById('detailModal').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
+document.getElementById('detailModal').addEventListener('click', (e) => { if (e.target.id === 'detailModal') closeModal(); });
+</script>
+</body>
+</html>
