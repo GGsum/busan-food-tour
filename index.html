@@ -215,9 +215,13 @@
 <div class="modal-overlay" id="detailModal">
     <div class="modal">
         <div class="modal-header">
-            <div class="tags">
-                <span class="badge region" id="modalRegion">-</span>
-                <span class="badge type" id="modalType">-</span>
+            <div>
+                <div class="tags">
+                    <span class="badge region" id="modalRegion">-</span>
+                    <span class="badge type" id="modalType">-</span>
+                </div>
+                <!-- ✅ 修复：添加缺失的标题元素 -->
+                <h2 class="modal-title" id="modalTitle" style="margin-top:8px;">-</h2>
             </div>
             <button onclick="closeModal('detailModal')" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
         </div>
